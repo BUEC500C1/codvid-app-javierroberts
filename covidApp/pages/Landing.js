@@ -150,7 +150,21 @@ class Landing extends React.Component {
           String(position.coords.longitude),
         ).then(
           response => {
-            const address = response.results[0].address_components[3].long_name;
+            let address = '';
+
+            for (var addressParse in response.results[0].address_components) {
+              if (
+                response.results[0].address_components[
+                  addressParse
+                ].types.includes('country')
+              ) {
+                address =
+                  response.results[0].address_components[addressParse]
+                    .long_name;
+              }
+            }
+
+            address = response.results[0].address_components[3].long_name;
             const apiAddress = address.replace(' ', '-');
             this.setState({country: address}, this.getCases(apiAddress));
           },
