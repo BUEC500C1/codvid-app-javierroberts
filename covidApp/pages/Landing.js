@@ -1,6 +1,7 @@
 import React from 'react';
 import {View, StyleSheet} from 'react-native';
 import Geocode from 'react-geocode';
+import Geolocation from 'react-native-geolocation-service';
 import {
   Container,
   Header,
@@ -20,6 +21,7 @@ import {
 } from 'native-base';
 
 import Map from '../components/Map';
+import DataDisplay from '../components/DataDisplay';
 
 const styles = StyleSheet.create({
   container: {
@@ -29,7 +31,7 @@ const styles = StyleSheet.create({
   header: {
     flex: 1.7,
   },
-  map: {
+  mainData: {
     flex: 10,
   },
   footer: {
@@ -48,17 +50,22 @@ class Landing extends React.Component {
       country: '',
       search: '',
       region: {
-        latitude: 42.3510693,
-        longitude: -71.129794,
-        latitudeDelta: 0.0922,
-        longitudeDelta: 0.0421,
+        latitude: 0,
+        longitude: 0,
+        latitudeDelta: 0.09,
+        longitudeDelta: 0.9,
       },
       cases: 0,
-      active: false,
     };
+
+    Geocode.setApiKey('');
+    Geocode.setLanguage('en');
+
     this.handleSegmentChange = this.handleSegmentChange.bind(this);
     this.handleCountryChange = this.handleCountryChange.bind(this);
     this.handleSearchChange = this.handleSearchChange.bind(this);
+    this.setCurrentLocation = this.setCurrentLocation.bind(this);
+    this.getCases = this.getCases.bind(this);
   }
 
   handleSegmentChange = () => {
@@ -77,8 +84,7 @@ class Landing extends React.Component {
     if (this.state.search === '') {
       return;
     }
-    Geocode.setApiKey('');
-    Geocode.setLanguage('en');
+
     Geocode.fromAddress(this.state.search).then(
       response => {
         const {lat, lng} = response.results[0].geometry.location;
@@ -96,10 +102,17 @@ class Landing extends React.Component {
       },
     );
 
+    this.getCases(this.state.search);
+
+    this.setState({country: this.state.search});
+    this.setState({search: ''});
+  };
+
+  getCases(country) {
     fetch(
-      'https://api.covid19api.com/country/' +
-        this.state.search +
-        '/status/confirmed/live?from=2020-03-01T00:00:00Z&to=2020-04-01T00:00:00Z',
+      'https://api.covid19api.com/total/country/' +
+        country +
+        '/status/confirmed?from=2020-03-01T00:00:00Z&to=2020-04-01T00:00:00Z',
       {
         method: 'GET',
         headers: {
@@ -112,24 +125,48 @@ class Landing extends React.Component {
         return response.json();
       })
       .then(responseData => {
-        console.log(responseData[0]);
-        return responseData[0];
+        return responseData[responseData.length - 1];
       })
       .then(data => {
         this.setState({cases: data.Cases});
-        console.log('cases: ' + data.Cases);
       })
 
       .catch(err => {
         console.log('fetch error' + err);
       });
+  }
 
-    this.setState({country: this.state.search});
-    this.setState({search: ''});
-    if (this.state.active === false) {
-      this.setState({active: true});
-    }
+  setCurrentLocation = () => {
+    Geolocation.getCurrentPosition(
+      position => {
+        this.setState({
+          region: {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          },
+        });
+        Geocode.fromLatLng(
+          String(position.coords.latitude),
+          String(position.coords.longitude),
+        ).then(
+          response => {
+            const address = response.results[0].address_components[3].long_name;
+            const apiAddress = address.replace(' ', '-');
+            this.setState({country: address}, this.getCases(apiAddress));
+          },
+          error => {
+            console.error(error);
+          },
+        );
+      },
+      error => console.log(error.message),
+      {enableHighAccuracy: true, timeout: 20000, maximumAge: 1000},
+    );
   };
+
+  componentDidMount() {
+    this.setCurrentLocation();
+  }
 
   render() {
     return (
@@ -143,20 +180,25 @@ class Landing extends React.Component {
                 onChangeText={this.handleSearchChange}
                 value={this.state.search}
               />
-              <Icon name="pin" />
+              <Button transparent onPress={this.setCurrentLocation}>
+                <Icon name="pin" />
+              </Button>
             </Item>
             <Button transparent onPress={this.handleCountryChange}>
               <Text>Search</Text>
             </Button>
           </Header>
         </View>
-        <Map
-          style={styles.map}
-          location={this.state.region}
-          country={this.state.country}
-          cases={this.state.cases}
-          active={this.state.active}
-        />
+        {this.state.activeSeg === 'map' ? (
+          <Map
+            style={styles.mainData}
+            location={this.state.region}
+            country={this.state.country}
+            cases={this.state.cases}
+          />
+        ) : (
+          <DataDisplay style={styles.mainData} country={this.state.country} />
+        )}
         <Segment style={styles.footer}>
           <Button
             first

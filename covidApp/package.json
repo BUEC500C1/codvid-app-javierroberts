@@ -10,11 +10,13 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@react-native-community/geolocation": "^2.0.2",
     "axios": "^0.19.2",
     "native-base": "^2.13.12",
     "react": "16.11.0",
     "react-geocode": "^0.2.1",
     "react-native": "0.62.2",
+    "react-native-geolocation-service": "^4.0.0",
     "react-native-maps": "0.27.1"
   },
   "devDependencies": {
