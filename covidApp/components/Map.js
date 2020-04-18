@@ -5,15 +5,22 @@ class Map extends React.Component {
   constructor(props) {
     super(props);
   }
+
   render() {
     return (
-      <MapView region={this.props.location} style={this.props.style}>
-        <Marker
-          coordinate={this.props.location}
-          title={this.props.country}
-          description={'Confirmed cases: ' + String(this.props.cases)}
-          isPreselected={true}
-        />
+      <MapView
+        region={this.props.location}
+        style={this.props.style}
+        onLongPress={this.props.handleMapPress}
+        showsUserLocation={true}>
+        {this.props.markers.map((marker, i) => (
+          <Marker
+            key={i}
+            coordinate={marker.coordinate}
+            title={marker.title}
+            description={'Active: ' + String(marker.description)}
+          />
+        ))}
       </MapView>
     );
   }

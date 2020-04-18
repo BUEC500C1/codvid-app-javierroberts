@@ -1,7 +1,8 @@
 import React from 'react';
-import {View, StyleSheet} from 'react-native';
+import {View, Keyboard, ScrollView, StyleSheet} from 'react-native';
 import Geocode from 'react-geocode';
 import Geolocation from 'react-native-geolocation-service';
+import LinearGradient from 'react-native-linear-gradient';
 import {
   Container,
   Header,
@@ -26,19 +27,57 @@ import DataDisplay from '../components/DataDisplay';
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    flexDirection: 'column',
   },
   header: {
-    flex: 1.7,
+    flex: 1.9,
   },
+
   mainData: {
     flex: 10,
   },
-  footer: {
+  data: {
     flex: 1,
   },
-  segment: {
+  footer: {
+    flex: 1.3,
+  },
+  segmentRight: {
     marginBottom: 10,
+    borderTopRightRadius: 4,
+    borderBottomRightRadius: 4,
+    borderTopWidth: 2,
+    borderRightWidth: 2,
+    borderBottomWidth: 2,
+    borderLeftWidth: 2,
+    borderColor: '#7b4397',
+  },
+  segmentLeft: {
+    marginBottom: 10,
+    borderTopWidth: 2,
+    borderBottomWidth: 2,
+    borderLeftWidth: 2,
+    borderColor: '#7b4397',
+  },
+  segmentText: {
+    fontWeight: '700',
+    color: 'white',
+  },
+  background: {
+    flexDirection: 'column',
+    flex: 1,
+  },
+  test: {
+    height: '100%',
+    width: '100%',
+  },
+  test2: {
+    height: '100%',
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  searchText: {
+    color: 'silver',
   },
 });
 
@@ -52,13 +91,20 @@ class Landing extends React.Component {
       region: {
         latitude: 0,
         longitude: 0,
-        latitudeDelta: 0.09,
-        longitudeDelta: 0.9,
+        latitudeDelta: 60,
+        longitudeDelta: 60,
       },
-      cases: 0,
+      data: {
+        active: 0,
+        recovered: 0,
+        deaths: 0,
+        confirmed: 0,
+      },
+      wrongSearch: false,
+      markers: [],
     };
 
-    Geocode.setApiKey('');
+    Geocode.setApiKey('AIzaSyADoeb7Pzz4M4gWPD3sjZZsZ8W80UPmoA0');
     Geocode.setLanguage('en');
 
     this.handleSegmentChange = this.handleSegmentChange.bind(this);
@@ -66,6 +112,9 @@ class Landing extends React.Component {
     this.handleSearchChange = this.handleSearchChange.bind(this);
     this.setCurrentLocation = this.setCurrentLocation.bind(this);
     this.getCases = this.getCases.bind(this);
+    this.getSegmentStyle = this.getSegmentStyle.bind(this);
+    this.setCountry = this.setCountry.bind(this);
+    this.handleMapPress = this.handleMapPress.bind(this);
   }
 
   handleSegmentChange = () => {
@@ -80,60 +129,165 @@ class Landing extends React.Component {
     this.setState({search: search});
   };
 
+  handleMapPress = location => {
+    const lat = location.nativeEvent.coordinate.latitude;
+    const long = location.nativeEvent.coordinate.longitude;
+    Geocode.fromLatLng(String(lat), String(long)).then(
+      response => {
+        let shortAddress = '';
+        let address = '';
+        let longAddress = '';
+        for (var addressParse in response.results[0].address_components) {
+          if (
+            response.results[0].address_components[addressParse].types.includes(
+              'country',
+            )
+          ) {
+            longAddress =
+              response.results[0].address_components[addressParse].long_name;
+
+            if (longAddress.length > 15) {
+              address = longAddress.split(' ');
+
+              for (var i in address) {
+                shortAddress += address[i][0];
+                console.log('SHORT ADDRESS: ' + shortAddress);
+              }
+            } else {
+              shortAddress = longAddress;
+            }
+          }
+        }
+
+        const apiAddress = longAddress.replace(' ', '-');
+
+        this.setState(
+          {
+            country: longAddress,
+            shortCountry: shortAddress,
+            region: {
+              latitude: lat,
+              longitude: long,
+              latitudeDelta: 60,
+              longitudeDelta: 60,
+            },
+          },
+          () => {
+            this.getCases(apiAddress, true, lat, long);
+          },
+        );
+      },
+      error => {
+        console.log('ERROR');
+        this.setState({wrongSearch: true});
+      },
+    );
+  };
+
+  setMarker = (latitude, longitude) => {
+    this.setState({
+      markers: [
+        ...this.state.markers,
+        {
+          coordinate: {
+            latitude: latitude,
+            longitude: longitude,
+          },
+          title: this.state.shortCountry,
+          description: this.state.data.active,
+        },
+      ],
+    });
+  };
+
   handleCountryChange = () => {
+    Keyboard.dismiss();
     if (this.state.search === '') {
       return;
     }
 
+    console.log('SEARCH: ' + this.state.search);
+
     Geocode.fromAddress(this.state.search).then(
       response => {
+        this.setState({wrongSearch: false});
         const {lat, lng} = response.results[0].geometry.location;
-        this.setState({
-          region: {
-            latitude: lat,
-            longitude: lng,
-            latitudeDelta: 0.92,
-            longitudeDelta: 0.0421,
+        this.setState(
+          {
+            region: {
+              latitude: lat,
+              longitude: lng,
+            },
           },
-        });
+          this.setCountry,
+        );
       },
       error => {
-        console.error(error);
+        this.setState({wrongSearch: true});
+        this.setState({search: ''});
       },
     );
-
-    this.getCases(this.state.search);
-
-    this.setState({country: this.state.search});
-    this.setState({search: ''});
   };
 
-  getCases(country) {
-    fetch(
-      'https://api.covid19api.com/total/country/' +
-        country +
-        '/status/confirmed?from=2020-03-01T00:00:00Z&to=2020-04-01T00:00:00Z',
-      {
+  setCountry() {
+    let longAddress = this.state.search;
+    let shortAddress = '';
+    let address = '';
+
+    if (longAddress.length > 15) {
+      address = longAddress.split(' ');
+
+      for (var i in address) {
+        shortAddress += address[i][0];
+        console.log('SHORT ADDRESS: ' + shortAddress);
+      }
+    } else {
+      shortAddress = longAddress;
+    }
+
+    this.setState({
+      country: this.state.longAddress,
+      shortCountry: shortAddress,
+    });
+    this.setState({search: ''});
+  }
+
+  getCases(country, marker, latitude, longitude) {
+    if (this.state.wrongSearch === false) {
+      console.log('TRYING TO GET CASES');
+      fetch('https://api.covid19api.com/live/country/' + country, {
         method: 'GET',
         headers: {
           Accept: 'application/json',
           'Content-Type': 'application/json',
         },
-      },
-    )
-      .then(response => {
-        return response.json();
       })
-      .then(responseData => {
-        return responseData[responseData.length - 1];
-      })
-      .then(data => {
-        this.setState({cases: data.Cases});
-      })
+        .then(response => {
+          return response.json();
+        })
+        .then(responseData => {
+          return responseData[responseData.length - 1];
+        })
+        .then(data => {
+          this.setState((prevState, props) => {
+            return {
+              data: {
+                active: data.Active,
+                recovered: data.Recovered,
+                confirmed: data.Confirmed,
+                deaths: data.Deaths,
+              },
+            };
+          });
 
-      .catch(err => {
-        console.log('fetch error' + err);
-      });
+          marker && this.setMarker(latitude, longitude);
+        })
+
+        .catch(err => {
+          this.setState({wrongSearch: true});
+          console.log('fetch error' + err);
+        });
+    }
   }
 
   setCurrentLocation = () => {
@@ -143,6 +297,8 @@ class Landing extends React.Component {
           region: {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
+            latitudeDelta: 60,
+            longitudeDelta: 60,
           },
         });
         Geocode.fromLatLng(
@@ -150,7 +306,9 @@ class Landing extends React.Component {
           String(position.coords.longitude),
         ).then(
           response => {
+            let shortAddress = '';
             let address = '';
+            let longAddress = '';
 
             for (var addressParse in response.results[0].address_components) {
               if (
@@ -158,15 +316,27 @@ class Landing extends React.Component {
                   addressParse
                 ].types.includes('country')
               ) {
-                address =
+                longAddress =
                   response.results[0].address_components[addressParse]
                     .long_name;
+                if (longAddress.length > 15) {
+                  address = longAddress.split(' ');
+
+                  for (var i in address) {
+                    shortAddress += address[i][0];
+                    console.log('SHORT ADDRESS: ' + shortAddress);
+                  }
+                } else {
+                  shortAddress = longAddress;
+                }
               }
             }
 
-            address = response.results[0].address_components[3].long_name;
-            const apiAddress = address.replace(' ', '-');
-            this.setState({country: address}, this.getCases(apiAddress));
+            const apiAddress = longAddress.replace(' ', '-');
+            this.setState(
+              {country: longAddress, shortCountry: shortAddress},
+              this.getCases(apiAddress),
+            );
           },
           error => {
             console.error(error);
@@ -182,51 +352,75 @@ class Landing extends React.Component {
     this.setCurrentLocation();
   }
 
+  getSegmentStyle = (name, style) => {
+    if (this.state.activeSeg === name) {
+      return {...style, ...{backgroundColor: '#7b4397'}};
+    } else {
+      return style;
+    }
+  };
+
   render() {
     return (
       <Container style={styles.container}>
         <View style={styles.header}>
-          <Header searchBar rounded>
-            <Item>
-              <Icon name="ios-search" />
-              <Input
-                placeholder="Country"
-                onChangeText={this.handleSearchChange}
-                value={this.state.search}
-              />
-              <Button transparent onPress={this.setCurrentLocation}>
-                <Icon name="pin" />
+          <LinearGradient style={styles.test} colors={['#3d72b4', '#7b4397']}>
+            <Header transparent={true} searchBar rounded>
+              <Item>
+                <Icon name="ios-search" />
+
+                <Input
+                  placeholder={
+                    this.state.wrongSearch ? 'Country not found!' : 'Country'
+                  }
+                  onChangeText={this.handleSearchChange}
+                  value={this.state.search}
+                />
+
+                <Button transparent onPress={this.setCurrentLocation}>
+                  <Icon name="pin" />
+                </Button>
+              </Item>
+              <Button transparent onPress={this.handleCountryChange}>
+                <Text style={styles.searchText}>Search</Text>
               </Button>
-            </Item>
-            <Button transparent onPress={this.handleCountryChange}>
-              <Text>Search</Text>
-            </Button>
-          </Header>
+            </Header>
+          </LinearGradient>
         </View>
-        {this.state.activeSeg === 'map' ? (
-          <Map
-            style={styles.mainData}
-            location={this.state.region}
-            country={this.state.country}
-            cases={this.state.cases}
-          />
-        ) : (
-          <DataDisplay style={styles.mainData} country={this.state.country} />
-        )}
+        <View style={styles.mainData}>
+          {this.state.activeSeg === 'map' ? (
+            <Map
+              style={styles.data}
+              location={this.state.region}
+              country={this.state.shortCountry}
+              cases={this.state.data.active}
+              handleMapPress={this.handleMapPress}
+              markers={this.state.markers}
+              onRegionChange={this.onRegionChange}
+            />
+          ) : (
+            <DataDisplay
+              style={styles.data}
+              country={this.state.shortCountry}
+              data={this.state.data}
+            />
+          )}
+        </View>
+
         <Segment style={styles.footer}>
-          <Button
-            first
-            style={styles.segment}
-            onPress={this.handleSegmentChange}
-            active={this.state.activeSeg === 'map' ? true : false}>
-            <Text>Map</Text>
-          </Button>
-          <Button
-            style={styles.segment}
-            onPress={this.handleSegmentChange}
-            active={this.state.activeSeg === 'data' ? true : false}>
-            <Text>Data</Text>
-          </Button>
+          <LinearGradient style={styles.test2} colors={['#dc2430', '#b35d62']}>
+            <Button
+              first
+              style={this.getSegmentStyle('map', styles.segmentLeft)}
+              onPress={this.handleSegmentChange}>
+              <Text style={styles.segmentText}>Map</Text>
+            </Button>
+            <Button
+              style={this.getSegmentStyle('data', styles.segmentRight)}
+              onPress={this.handleSegmentChange}>
+              <Text style={styles.segmentText}>Data</Text>
+            </Button>
+          </LinearGradient>
         </Segment>
       </Container>
     );
