@@ -18,7 +18,8 @@ class Map extends React.Component {
             key={i}
             coordinate={marker.coordinate}
             title={marker.title}
-            description={'Active: ' + String(marker.description)}
+            description={'Active cases: ' + String(marker.description)}
+            onCalloutPress={this.props.onMarkerPress}
           />
         ))}
       </MapView>

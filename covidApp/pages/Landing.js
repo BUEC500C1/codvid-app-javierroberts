@@ -55,7 +55,14 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderTopWidth: 2,
     borderBottomWidth: 2,
-    borderLeftWidth: 2,
+    borderLeftWidth: 1.5,
+    borderColor: '#7b4397',
+  },
+  segmentMiddle: {
+    marginBottom: 10,
+    borderTopWidth: 2,
+    borderBottomWidth: 2,
+    borderLeftWidth: 1.5,
     borderColor: '#7b4397',
   },
   segmentText: {
@@ -87,6 +94,7 @@ class Landing extends React.Component {
     this.state = {
       activeSeg: 'map',
       country: '',
+      shortCountry: '',
       search: '',
       region: {
         latitude: 0,
@@ -95,6 +103,12 @@ class Landing extends React.Component {
         longitudeDelta: 60,
       },
       data: {
+        active: 0,
+        recovered: 0,
+        deaths: 0,
+        confirmed: 0,
+      },
+      dataWorld: {
         active: 0,
         recovered: 0,
         deaths: 0,
@@ -117,11 +131,13 @@ class Landing extends React.Component {
     this.handleMapPress = this.handleMapPress.bind(this);
   }
 
-  handleSegmentChange = () => {
-    if (this.state.activeSeg === 'map') {
+  handleSegmentChange = segment => {
+    if (segment === 'map') {
+      this.setState({activeSeg: 'map'});
+    } else if (segment === 'data') {
       this.setState({activeSeg: 'data'});
     } else {
-      this.setState({activeSeg: 'map'});
+      this.setState({activeSeg: 'world'});
     }
   };
 
@@ -151,7 +167,6 @@ class Landing extends React.Component {
 
               for (var i in address) {
                 shortAddress += address[i][0];
-                console.log('SHORT ADDRESS: ' + shortAddress);
               }
             } else {
               shortAddress = longAddress;
@@ -185,6 +200,7 @@ class Landing extends React.Component {
   };
 
   setMarker = (latitude, longitude) => {
+    console.log('setting marker');
     this.setState({
       markers: [
         ...this.state.markers,
@@ -210,27 +226,35 @@ class Landing extends React.Component {
 
     Geocode.fromAddress(this.state.search).then(
       response => {
-        this.setState({wrongSearch: false});
         const {lat, lng} = response.results[0].geometry.location;
-        this.setState(
-          {
-            region: {
-              latitude: lat,
-              longitude: lng,
-            },
+        let country = '';
+        let region = '';
+        for (var i in response.results[0].address_components) {
+          if (
+            response.results[0].address_components[i].types.includes('country')
+          ) {
+            country = response.results[0].address_components[i].long_name;
+          }
+        }
+
+        console.log('Fdasf ' + country);
+        this.setState({
+          region: {
+            latitude: lat,
+            longitude: lng,
           },
-          this.setCountry,
-        );
+        });
+        this.getCases(country);
+        this.setCountry(country);
       },
       error => {
-        this.setState({wrongSearch: true});
-        this.setState({search: ''});
+        return;
       },
     );
   };
 
-  setCountry() {
-    let longAddress = this.state.search;
+  setCountry(country) {
+    let longAddress = country;
     let shortAddress = '';
     let address = '';
 
@@ -253,9 +277,46 @@ class Landing extends React.Component {
   }
 
   getCases(country, marker, latitude, longitude) {
-    if (this.state.wrongSearch === false) {
-      console.log('TRYING TO GET CASES');
-      fetch('https://api.covid19api.com/live/country/' + country, {
+    this.setState({wrongSearch: false});
+    console.log('TRYING TO GET CASES ' + country);
+    if (country === 'world') {
+      fetch('https://api.covid19api.com/world/total', {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+      })
+        .then(response => {
+          return response.json();
+        })
+        .then(responseData => {
+          return responseData;
+        })
+        .then(data => {
+          if (data === undefined) {
+            this.setState({wrongSearch: true});
+            return;
+          }
+          this.setState((prevState, props) => {
+            return {
+              dataWorld: {
+                active:
+                  data.TotalConfirmed - data.TotalRecovered - data.TotalDeaths,
+                recovered: data.TotalRecovered,
+                confirmed: data.TotalConfirmed,
+                deaths: data.TotalDeaths,
+              },
+            };
+          });
+        })
+
+        .catch(err => {
+          this.setState({wrongSearch: true});
+          console.log('fetch error' + err);
+        });
+    } else {
+      fetch('https://api.covid19api.com/total/country/' + country, {
         method: 'GET',
         headers: {
           Accept: 'application/json',
@@ -269,10 +330,14 @@ class Landing extends React.Component {
           return responseData[responseData.length - 1];
         })
         .then(data => {
+          if (data === undefined) {
+            this.setState({wrongSearch: true});
+            return;
+          }
           this.setState((prevState, props) => {
             return {
               data: {
-                active: data.Active,
+                active: data.Confirmed - data.Recovered - data.Deaths,
                 recovered: data.Recovered,
                 confirmed: data.Confirmed,
                 deaths: data.Deaths,
@@ -361,6 +426,44 @@ class Landing extends React.Component {
   };
 
   render() {
+    let mainComponent;
+    switch (this.state.activeSeg) {
+      case 'map':
+        mainComponent = (
+          <Map
+            style={styles.data}
+            location={this.state.region}
+            country={this.state.shortCountry}
+            cases={this.state.data.active}
+            handleMapPress={this.handleMapPress}
+            markers={this.state.markers}
+            onRegionChange={this.onRegionChange}
+            onMarkerPress={() => {
+              this.setState({activeSeg: 'data'});
+            }}
+          />
+        );
+        break;
+
+      case 'data':
+        mainComponent = (
+          <DataDisplay
+            style={styles.data}
+            country={this.state.shortCountry}
+            data={this.state.data}
+          />
+        );
+        break;
+      case 'world':
+        mainComponent = (
+          <DataDisplay
+            style={styles.data}
+            country={'World'}
+            data={this.state.dataWorld}
+          />
+        );
+        break;
+    }
     return (
       <Container style={styles.container}>
         <View style={styles.header}>
@@ -387,38 +490,32 @@ class Landing extends React.Component {
             </Header>
           </LinearGradient>
         </View>
-        <View style={styles.mainData}>
-          {this.state.activeSeg === 'map' ? (
-            <Map
-              style={styles.data}
-              location={this.state.region}
-              country={this.state.shortCountry}
-              cases={this.state.data.active}
-              handleMapPress={this.handleMapPress}
-              markers={this.state.markers}
-              onRegionChange={this.onRegionChange}
-            />
-          ) : (
-            <DataDisplay
-              style={styles.data}
-              country={this.state.shortCountry}
-              data={this.state.data}
-            />
-          )}
-        </View>
+        <View style={styles.mainData}>{mainComponent}</View>
 
         <Segment style={styles.footer}>
           <LinearGradient style={styles.test2} colors={['#dc2430', '#b35d62']}>
             <Button
               first
               style={this.getSegmentStyle('map', styles.segmentLeft)}
-              onPress={this.handleSegmentChange}>
+              onPress={() => {
+                this.handleSegmentChange('map');
+              }}>
               <Text style={styles.segmentText}>Map</Text>
             </Button>
             <Button
-              style={this.getSegmentStyle('data', styles.segmentRight)}
-              onPress={this.handleSegmentChange}>
-              <Text style={styles.segmentText}>Data</Text>
+              style={this.getSegmentStyle('data', styles.segmentMiddle)}
+              onPress={() => {
+                this.handleSegmentChange('data');
+              }}>
+              <Text style={styles.segmentText}>Country</Text>
+            </Button>
+            <Button
+              style={this.getSegmentStyle('world', styles.segmentRight)}
+              onPress={() => {
+                this.handleSegmentChange('world');
+                this.getCases('world');
+              }}>
+              <Text style={styles.segmentText}>World</Text>
             </Button>
           </LinearGradient>
         </Segment>

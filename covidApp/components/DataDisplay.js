@@ -1,7 +1,7 @@
 import React from 'react';
 import {View, Text, StyleSheet, Image, Dimensions} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import {Row} from 'native-base';
+import {DatePicker} from 'native-base';
 
 const styles = StyleSheet.create({
   dataContainer: {
@@ -28,7 +28,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   dataRowText: {
-    fontSize: 20,
+    fontSize: 25,
     color: 'silver',
   },
   creditContainer: {
@@ -59,13 +59,13 @@ class DataDisplay extends React.Component {
           <View style={styles.infoContainer}>
             <View style={styles.dataRow}>
               <Text style={styles.dataRowText}>
-                confirmed cases: {this.props.data.confirmed}
+                Active cases: {this.props.data.active}
               </Text>
             </View>
 
             <View style={styles.dataRow}>
               <Text style={styles.dataRowText}>
-                active cases: {this.props.data.active}
+                confirmed cases: {this.props.data.confirmed}
               </Text>
             </View>
 
