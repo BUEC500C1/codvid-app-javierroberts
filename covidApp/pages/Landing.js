@@ -118,7 +118,7 @@ class Landing extends React.Component {
       markers: [],
     };
 
-    Geocode.setApiKey('AIzaSyApD6qtWWYHtpWKawkixBWGcF8yzjo98CE');
+    Geocode.setApiKey('');
     Geocode.setLanguage('en');
 
     this.handleSegmentChange = this.handleSegmentChange.bind(this);
