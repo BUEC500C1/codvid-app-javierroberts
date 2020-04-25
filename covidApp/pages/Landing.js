@@ -118,7 +118,7 @@ class Landing extends React.Component {
       markers: [],
     };
 
-    Geocode.setApiKey('');
+    Geocode.setApiKey('AIzaSyApD6qtWWYHtpWKawkixBWGcF8yzjo98CE');
     Geocode.setLanguage('en');
 
     this.handleSegmentChange = this.handleSegmentChange.bind(this);
@@ -484,7 +484,14 @@ class Landing extends React.Component {
                   <Icon name="pin" />
                 </Button>
               </Item>
-              <Button transparent onPress={this.handleCountryChange}>
+              <Button
+                transparent
+                onPress={() => {
+                  this.handleCountryChange();
+                  this.state.activeSeg === 'world'
+                    ? this.setState({activeSeg: 'data'})
+                    : null;
+                }}>
                 <Text style={styles.searchText}>Search</Text>
               </Button>
             </Header>
